@@ -747,7 +747,9 @@ HRESULT WINAPI D3D12Hook::resize_buffers(IDXGISwapChain3* swap_chain, UINT buffe
                 const auto ow = (UINT)(od.DesktopCoordinates.right - od.DesktopCoordinates.left);
                 const auto oh = (UINT)(od.DesktopCoordinates.bottom - od.DesktopCoordinates.top);
 
-                if (ow > width && oh > height) {
+                // Either dimension may be larger: a full-width SbS panel (e.g. 3840x1080 for two
+                // 1920x1080 eyes) has the same height as a 16:9 per-eye render.
+                if (ow >= width && oh >= height && (ow > width || oh > height)) {
                     spdlog::info("[Flat3D] Forcing native swapchain {}x{} (engine asked {}x{})", ow, oh, width, height);
                     width = ow;
                     height = oh;
