@@ -2456,6 +2456,13 @@ bool VR::is_hand_behind_head(VRRuntime::Hand hand, float sensitivity) const {
 }
 
 void VR::update_audio_camera() {
+    // Flat3D never moves the camera joints (per-eye offset is applied in the view matrix hook),
+    // so there is nothing to apply or restore. Writing the pose back breaks Onimusha: Way of the Sword
+    // (camera ends up stuck somewhere else, same joint-write issue as the FreeCam workaround).
+    if (is_using_flat3d()) {
+        return;
+    }
+
     REF_PROFILE_FUNCTION();
 
     if (!is_hmd_active()) {
@@ -2528,6 +2535,14 @@ void VR::update_render_matrix() {
 }
 
 void VR::restore_audio_camera() {
+    // Flat3D never moves the camera joints (per-eye offset is applied in the view matrix hook),
+    // so there is nothing to apply or restore. Writing the pose back breaks Onimusha: Way of the Sword
+    // (camera ends up stuck somewhere else, same joint-write issue as the FreeCam workaround).
+    if (is_using_flat3d()) {
+        m_needs_audio_restore = false;
+        return;
+    }
+
     if (!m_needs_audio_restore) {
         return;
     }
@@ -2567,6 +2582,14 @@ void VR::restore_audio_camera() {
 }
 
 void VR::restore_camera() {
+    // Flat3D never moves the camera joints (per-eye offset is applied in the view matrix hook),
+    // so there is nothing to apply or restore. Writing the pose back breaks Onimusha: Way of the Sword
+    // (camera ends up stuck somewhere else, same joint-write issue as the FreeCam workaround).
+    if (is_using_flat3d()) {
+        m_needs_camera_restore = false;
+        return;
+    }
+
     REF_PROFILE_FUNCTION();
 
     if (!m_needs_camera_restore) {
