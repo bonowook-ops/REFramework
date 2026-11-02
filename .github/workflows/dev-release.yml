@@ -77,7 +77,14 @@ jobs:
       # REF_LEIASR is gated on SRLIB_FOUND, so this is a no-op (with a warning) on any
       # run where the private SR-lib submodule was skipped for lack of credentials.
       - name: Configure CMake
-        run: cmake -S ${{github.workspace}} -B ${{github.workspace}}/build -G "Visual Studio 18 2026" -A x64 -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DDEVELOPER_MODE=ON -DREF_LEIASR=ON "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+        shell: bash
+        run: |
+          # add_subdirectory(dependencies/SR-lib) hard-fails when the private submodule was skipped,
+          # so only turn LeiaSR on when the submodule is actually checked out.
+          LEIASR=OFF
+          if [ -f dependencies/SR-lib/CMakeLists.txt ]; then LEIASR=ON; fi
+          echo "REF_LEIASR=$LEIASR"
+          cmake -S "${{github.workspace}}" -B "${{github.workspace}}/build" -G "Visual Studio 18 2026" -A x64 -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DDEVELOPER_MODE=ON -DREF_LEIASR=$LEIASR "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target REFramework
