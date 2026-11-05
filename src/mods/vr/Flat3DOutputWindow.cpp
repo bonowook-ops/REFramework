@@ -112,8 +112,11 @@ DWORD WINAPI Flat3DOutputWindow::window_thread(LPVOID param) {
     wc.hbrBackground = nullptr;
     RegisterClassExW(&wc);
 
-    self->m_hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW, s_window_class,
-        L"REFramework Flat3D Output", WS_POPUP, self->m_rect.left, self->m_rect.top,
+    // WS_EX_APPWINDOW (and no WS_EX_TOOLWINDOW) puts it in the taskbar under its own name, so it
+    // is tellable from the game's window and can be picked out of Alt+Tab. WS_EX_NOACTIVATE still
+    // keeps it from stealing focus.
+    self->m_hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_APPWINDOW, s_window_class,
+        L"AFR SBS Output", WS_POPUP, self->m_rect.left, self->m_rect.top,
         self->m_rect.right - self->m_rect.left, self->m_rect.bottom - self->m_rect.top, nullptr, nullptr,
         wc.hInstance, nullptr);
 
@@ -123,7 +126,9 @@ DWORD WINAPI Flat3DOutputWindow::window_thread(LPVOID param) {
         return 0;
     }
 
-    // The window needs its own message pump: the game's pump never sees it.
+    // The window needs its own message pump: the game's pump never sees it. shutdown() posts
+    // WM_QUIT here, which is the only way out - without it this thread blocks in GetMessage and
+    // the game's process stays alive after the user quits.
     MSG msg{};
 
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
@@ -131,7 +136,36 @@ DWORD WINAPI Flat3DOutputWindow::window_thread(LPVOID param) {
         DispatchMessageW(&msg);
     }
 
+    DestroyWindow(self->m_hwnd);
+    self->m_hwnd = nullptr;
+
     return 0;
+}
+
+void Flat3DOutputWindow::shutdown() {
+    reset();
+
+    if (m_thread != nullptr) {
+        if (m_hwnd != nullptr) {
+            PostMessageW(m_hwnd, WM_QUIT, 0, 0);
+        }
+
+        if (WaitForSingleObject(m_thread, 2000) == WAIT_TIMEOUT) {
+            spdlog::warn("[Flat3D][OutputWindow] message thread did not exit in time");
+        }
+
+        CloseHandle(m_thread);
+        m_thread = nullptr;
+    }
+
+    if (m_ready != nullptr) {
+        CloseHandle(m_ready);
+        m_ready = nullptr;
+    }
+
+    m_hwnd = nullptr;
+    m_visible = false;
+    m_failed = false;
 }
 
 bool Flat3DOutputWindow::create_window(HWND game_window, int monitor_index) {

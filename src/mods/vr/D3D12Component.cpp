@@ -13,6 +13,7 @@
 #include "d3d12/DirectXTK.hpp"
 
 #include "Flat3DGuiRedirect.hpp"
+#include "Flat3DOutputWindow.hpp"
 #include "D3D12Component.hpp"
 
 namespace vrmod {
@@ -1485,6 +1486,9 @@ void D3D12Component::on_reset(VR* vr) {
     m_converted_eye_tex.reset();
     m_flat3d_compose.reset();
     Flat3DGuiRedirect::get().on_reset();
+    // Drop the output window's swapchain and backbuffers too - they were created against the
+    // device that is going away. The window itself stays; ensure() rebuilds them next frame.
+    Flat3DOutputWindow::get().reset();
 
     for (auto& ctx : m_flat3d_src) {
         ctx.reset();

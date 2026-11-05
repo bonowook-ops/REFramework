@@ -29,6 +29,10 @@ public:
     void hide();
     void reset();
 
+    // Tears the window down and joins its message-loop thread. Must run on shutdown: the loop
+    // blocks in GetMessage forever otherwise and the game's process never exits.
+    void shutdown();
+
     ID3D12Resource* backbuffer(uint32_t& out_width, uint32_t& out_height);
     D3D12_CPU_DESCRIPTOR_HANDLE rtv(ID3D12Device* device, ID3D12Resource* backbuffer);
 
