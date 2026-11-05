@@ -1684,7 +1684,12 @@ if(REF_BUILD_FRAMEWORK AND CMAKE_SIZEOF_VOID_P EQUAL 8) # build-framework
 		OUTPUT_NAME
 			dinput8
 		LINK_FLAGS
-			"/DELAYLOAD:openvr_api.dll /DELAYLOAD:openxr_loader.dll /DELAYLOAD:PDPerfPlugin.dll /DELAYLOAD:d3d11.dll /DELAYLOAD:d3d12.dll /DELAYLOAD:D3DCOMPILER_47.dll"
+			# /DEBUG emits dinput8.pdb. Without it a reframework_crash.dmp resolves only to raw
+			# dinput8.dll offsets, so a fault inside a hooked game call cannot be traced back to
+			# the hook responsible. /DEBUG flips OPT to NOREF/NOICF by default, which would change
+			# the shipped binary, so both are restored explicitly: code generation is unchanged and
+			# the PDB carries public symbols, which is what stack resolution needs.
+			"/DEBUG /OPT:REF /OPT:ICF /DELAYLOAD:openvr_api.dll /DELAYLOAD:openxr_loader.dll /DELAYLOAD:PDPerfPlugin.dll /DELAYLOAD:d3d11.dll /DELAYLOAD:d3d12.dll /DELAYLOAD:D3DCOMPILER_47.dll"
 		RUNTIME_OUTPUT_DIRECTORY_RELEASE
 			"${CMAKE_BINARY_DIR}/bin/REFramework"
 		RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO

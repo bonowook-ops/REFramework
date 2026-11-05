@@ -117,7 +117,12 @@ jobs:
           7z a ${{github.workspace}}/REFramework.zip ${{github.workspace}}/PDAFWPlugin.dll
           # Ship the PDB: without it a reframework_crash.dmp only gives raw dinput8.dll offsets,
           # so a crash inside a hook cannot be traced back to the function that caused it.
-          7z a ${{github.workspace}}/REFramework.zip ${{github.workspace}}/build/bin/REFramework/dinput8.pdb
+          # Tolerated if absent - a missing PDB must not fail an otherwise good build.
+          if (Test-Path "${{github.workspace}}/build/bin/REFramework/dinput8.pdb") {
+            7z a ${{github.workspace}}/REFramework.zip ${{github.workspace}}/build/bin/REFramework/dinput8.pdb
+          } else {
+            Write-Host "dinput8.pdb not found - packaging without it"
+          }
 
       - name: Compress VR prerequisites
         run: |
