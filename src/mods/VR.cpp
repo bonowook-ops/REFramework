@@ -5168,6 +5168,21 @@ void VR::draw_flat3d_ui() {
 
     m_flat3d_crop_eyes_169->draw("Crop Eyes to 16:9 (SbS/TaB)");
 
+    m_flat3d_output_window->draw("Full-Res Output Window");
+
+    if (m_flat3d_output_window->value()) {
+        ImGui::TextWrapped("Draws the packed image a second time into its own borderless window on the chosen "
+                           "monitor, at that monitor's full size, so each eye keeps the full backbuffer width "
+                           "instead of half of it. Run the game windowed at a 16:9 resolution (e.g. 1920x1080); "
+                           "the window is topmost and never takes focus, so input still goes to the game.");
+        ImGui::TextWrapped("For SBS XR glasses, which split the desktop down the middle and show each half as-is. "
+                           "A 3D TV's own side-by-side mode stretches each half back itself, so leave this off "
+                           "there and use plain Side-by-Side.");
+        // ModInt32::draw hard-codes a 5..40 slider, so drive the value directly.
+        ImGui::SliderInt("Output Monitor (0 = auto)", &m_flat3d_output_window_monitor->value(), 0, 8);
+        ImGui::TextDisabled("Auto picks the widest panel. The monitor list is written to the log on creation.");
+    }
+
     if (ImGui::TreeNode("Ghosting / Crosstalk")) {
         ImGui::TextWrapped("Two compose-time range-compression levers against ghosting (a faint copy of the other "
                            "eye bleeding through). Which one wins is panel- and content-dependent; both are off at "

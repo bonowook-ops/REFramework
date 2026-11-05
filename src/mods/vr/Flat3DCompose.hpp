@@ -104,6 +104,13 @@ public:
         d3d12::TextureContext& pre_right, ID3D12Resource* backbuffer, uint32_t backbuffer_index,
         const RepackParams& params, HWND window, ID3D12Resource* ui_tex = nullptr, ID3D12Resource* ui_depth_tex = nullptr);
 
+    // Full-resolution output window (see Flat3DOutputWindow). Set every frame from the VR mod's
+    // options; kept off RepackParams because that struct must match the shader cbuffer exactly.
+    void set_output_window(bool enabled, int monitor_index) {
+        m_output_window_enabled = enabled;
+        m_output_window_monitor = monitor_index;
+    }
+
 private:
     void update_srvs(ID3D12Device* device, ID3D12Resource* left, ID3D12Resource* right, ID3D12Resource* pre_left, ID3D12Resource* pre_right);
     D3D12_CPU_DESCRIPTOR_HANDLE update_rtv(ID3D12Device* device, ID3D12Resource* backbuffer, uint32_t index);
@@ -119,6 +126,9 @@ private:
 
     std::array<ID3D12Resource*, 4> m_last_eye_textures{}; // change tracking only, not owning
     std::array<ID3D12Resource*, 8> m_last_rtv_textures{}; // change tracking only, not owning
+
+    bool m_output_window_enabled{false};
+    int m_output_window_monitor{0};
 
     std::array<d3d12::CommandContext, 3> m_commands{};
 

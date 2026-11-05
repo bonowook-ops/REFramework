@@ -796,6 +796,14 @@ public:
         }, FLAT3D_SBS)
     };
     const ModToggle::Ptr m_flat3d_eye_swap{ ModToggle::create(generate_name("Flat3D_EyeSwap"), false) };
+
+    // Full-resolution output window: draws the packed stereo image a second time into a separate
+    // borderless window sized to the chosen monitor, so each eye keeps the full backbuffer width.
+    // Needed by SBS XR glasses (3840x1080), which split the desktop down the middle and do NOT
+    // stretch each half back - unlike a 3D TV's own side-by-side mode, which does.
+    const ModToggle::Ptr m_flat3d_output_window{ ModToggle::create(generate_name("Flat3D_OutputWindow"), false) };
+    // 0 = auto (widest panel, i.e. the 32:9 one), 1..N = Windows monitor order as logged on creation.
+    const ModInt32::Ptr m_flat3d_output_window_monitor{ ModInt32::create(generate_name("Flat3D_OutputWindowMonitor"), 0) };
     // Clip-space separation (dynamic3d 1.3) is THE stereo knob: the projection shear IS this value,
     // and it equals total BACKGROUND disparity as a fraction of the screen width. Being a clip-space
     // quantity it is FoV-independent by construction, so the old reference-FoV slider and its
@@ -964,6 +972,8 @@ public:
         *m_enable_asynchronous_rendering,
         *m_flat3d_output_mode,
         *m_flat3d_eye_swap,
+        *m_flat3d_output_window,
+        *m_flat3d_output_window_monitor,
         *m_flat3d_separation,
         *m_flat3d_convergence,
         *m_flat3d_ghost_contrast,

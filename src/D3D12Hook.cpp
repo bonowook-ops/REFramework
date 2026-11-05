@@ -15,6 +15,7 @@
 #include "REFramework.hpp"
 
 #include "WindowFilter.hpp"
+#include "mods/vr/Flat3DOutputWindow.hpp"
 
 #include "D3D12Hook.hpp"
 
@@ -66,6 +67,12 @@ HRESULT WINAPI D3D12Hook::create_swapchain(IDXGIFactory4* factory, IUnknown* dev
 
     if (g_inside_d3d12_hook) {
         spdlog::info("create_swapchain (inside D3D12 hook)");
+        return create_swap_chain_fn(factory, device, hwnd, desc, p_fullscreen_desc, p_restrict_to_output, swap_chain);
+    }
+
+    // Our own Flat3D full-resolution output window: forward it untouched, or the hook would adopt
+    // it as the game's swapchain and start compositing into the wrong surface.
+    if (vrmod::Flat3DOutputWindow::s_creating.load()) {
         return create_swap_chain_fn(factory, device, hwnd, desc, p_fullscreen_desc, p_restrict_to_output, swap_chain);
     }
 
@@ -573,6 +580,12 @@ HRESULT WINAPI D3D12Hook::present(IDXGISwapChain3* swap_chain, uint64_t sync_int
         present_fn = d3d12->m_present_hook->get_original<decltype(D3D12Hook::present)*>();
     } else {
         present_fn = d3d12->m_swapchain_hook->get_method<decltype(D3D12Hook::present)*>(8);
+    }
+
+    // Our own Flat3D output window shares the swapchain vtable with the game's, so its Present
+    // lands here too. Let it through untouched - compositing it again would recurse.
+    if (vrmod::Flat3DOutputWindow::get().is_own(swap_chain)) {
+        return present_fn(swap_chain, sync_interval, flags, r9);
     }
 
     HWND swapchain_wnd{nullptr};

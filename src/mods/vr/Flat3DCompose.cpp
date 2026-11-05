@@ -6,6 +6,7 @@
 #include "REFramework.hpp"
 
 #include "Flat3DCompose.hpp"
+#include "Flat3DOutputWindow.hpp"
 
 namespace vrmod {
 // One fullscreen compose shader for every flatscreen 3D output mode. The
@@ -647,7 +648,48 @@ void Flat3DCompose::render(d3d12::TextureContext& left, d3d12::TextureContext& r
         cmd_list->ResourceBarrier(1, &barrier);
     }
 
+    // Full-resolution output window: record the SAME compose a second time into a window sized to
+    // the output monitor. The packing shader is driven by UV, so a 2W-wide target gives each eye
+    // the full backbuffer width instead of half of it - no 2:1 squeeze, nothing cropped.
+    auto present_output_window = false;
+
+    if (m_output_window_enabled) {
+        auto& out_window = Flat3DOutputWindow::get();
+
+        if (out_window.ensure(device, hook->get_command_queue(), m_output_format, window, m_output_window_monitor)) {
+            uint32_t out_width = 0;
+            uint32_t out_height = 0;
+            auto* const out_backbuffer = out_window.backbuffer(out_width, out_height);
+
+            if (out_backbuffer != nullptr) {
+                auto out_params = params;
+                out_params.out_size[0] = (int32_t)out_width;
+                out_params.out_size[1] = (int32_t)out_height;
+
+                barrier.Transition.pResource = out_backbuffer;
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+                cmd_list->ResourceBarrier(1, &barrier);
+
+                record_compose(cmd_list, out_window.rtv(device, out_backbuffer), out_width, out_height, out_params);
+
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+                cmd_list->ResourceBarrier(1, &barrier);
+
+                present_output_window = true;
+            }
+        }
+    } else {
+        Flat3DOutputWindow::get().hide();
+    }
+
     commands.has_commands = true;
     commands.execute();
+
+    // Present only after the compose is submitted, so the window never shows a half-written frame.
+    if (present_output_window) {
+        Flat3DOutputWindow::get().present();
+    }
 }
 } // namespace vrmod
