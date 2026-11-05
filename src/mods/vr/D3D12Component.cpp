@@ -423,6 +423,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
 
         const auto params = build_flat3d_params(vr, (uint32_t)bb_desc.Width, (uint32_t)bb_desc.Height);
         Flat3DOutputWindow::get().set_focusable(vr->m_flat3d_output_window_focusable->value());
+        Flat3DOutputWindow::get().set_focus_spoof(vr->m_flat3d_output_window_focus_spoof->value());
         m_flat3d_compose.set_output_window(vr->m_flat3d_output_window->value(), vr->m_flat3d_output_window_monitor->value());
         m_flat3d_compose.render(m_openvr.get_left(), m_openvr.get_right(), m_flat3d_pre_left_cache, m_flat3d_pre_right_cache, backbuffer.Get(), backbuffer_index, params, swap_desc.OutputWindow, m_flat3d_afw_ui_tex, m_flat3d_afw_ui_depth_tex);
 

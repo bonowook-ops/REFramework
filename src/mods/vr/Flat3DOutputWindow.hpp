@@ -2,11 +2,14 @@
 
 #include <array>
 #include <atomic>
+#include <memory>
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <wrl.h>
 #include <windows.h>
+
+#include <utility/FunctionHook.hpp>
 
 namespace vrmod {
 // Full-resolution stereo output window.
@@ -34,6 +37,18 @@ public:
 
     HWND window() const { return m_hwnd; }
     bool exists() const { return m_hwnd != nullptr; }
+
+    // Making the window focusable solves Lossless Scaling but breaks input twice over: the game
+    // gates reading devices on believing it is in front, and keystrokes land on whichever window
+    // holds focus - ours. Two separate pieces are needed.
+    //
+    //  - the hooks below answer "which window is in front" with the game's window, but only while
+    //    the real answer is this output window; everything else gets the truth.
+    //  - on activation the window hands keyboard focus straight back to the game via
+    //    AttachThreadInput, so it stays the foreground window for Lossless Scaling while key
+    //    messages go where they are useful.
+    void set_focus_spoof(bool enabled);
+    void install_focus_hooks(HWND game_window);
 
     void hide();
     void reset();
@@ -83,5 +98,20 @@ private:
     bool m_visible{false};
     bool m_focusable{false};
     static bool s_focusable; // read from the window thread, which has no instance pointer yet
+
+    static void hand_focus_to_game();
+
+    static HWND WINAPI get_foreground_window_hook();
+    static HWND WINAPI get_active_window_hook();
+    static HWND WINAPI get_focus_hook();
+    static HWND spoof(HWND real);
+
+    static std::atomic<bool> s_focus_spoof;
+    static HWND s_game_window;
+    static Flat3DOutputWindow* s_instance;
+
+    std::unique_ptr<FunctionHook> m_get_foreground_window_hook{};
+    std::unique_ptr<FunctionHook> m_get_active_window_hook{};
+    std::unique_ptr<FunctionHook> m_get_focus_hook{};
 };
 } // namespace vrmod

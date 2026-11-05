@@ -10,6 +10,115 @@ using namespace Microsoft::WRL;
 namespace vrmod {
 std::atomic<bool> Flat3DOutputWindow::s_creating{false};
 bool Flat3DOutputWindow::s_focusable{false};
+std::atomic<bool> Flat3DOutputWindow::s_focus_spoof{true};
+HWND Flat3DOutputWindow::s_game_window{nullptr};
+Flat3DOutputWindow* Flat3DOutputWindow::s_instance{nullptr};
+
+void Flat3DOutputWindow::set_focus_spoof(bool enabled) {
+    s_focus_spoof.store(enabled);
+}
+
+// Answer with the game's window, but only when the window actually in front is ours. Any other
+// foreground window - another application, a dialog - gets the real answer, so alt-tabbing away
+// still takes input away from the game exactly as the user expects.
+HWND Flat3DOutputWindow::spoof(HWND real) {
+    if (!s_focus_spoof.load() || s_game_window == nullptr || s_instance == nullptr) {
+        return real;
+    }
+
+    if (real != nullptr && real == s_instance->m_hwnd) {
+        return s_game_window;
+    }
+
+    return real;
+}
+
+HWND WINAPI Flat3DOutputWindow::get_foreground_window_hook() {
+    auto* const self = s_instance;
+    const auto real = self != nullptr && self->m_get_foreground_window_hook != nullptr
+        ? self->m_get_foreground_window_hook->get_original<decltype(GetForegroundWindow)>()()
+        : nullptr;
+
+    return spoof(real);
+}
+
+HWND WINAPI Flat3DOutputWindow::get_active_window_hook() {
+    auto* const self = s_instance;
+    const auto real = self != nullptr && self->m_get_active_window_hook != nullptr
+        ? self->m_get_active_window_hook->get_original<decltype(GetActiveWindow)>()()
+        : nullptr;
+
+    return spoof(real);
+}
+
+HWND WINAPI Flat3DOutputWindow::get_focus_hook() {
+    auto* const self = s_instance;
+    const auto real = self != nullptr && self->m_get_focus_hook != nullptr
+        ? self->m_get_focus_hook->get_original<decltype(GetFocus)>()()
+        : nullptr;
+
+    return spoof(real);
+}
+
+void Flat3DOutputWindow::install_focus_hooks(HWND game_window) {
+    s_instance = this;
+    s_game_window = game_window;
+
+    if (m_get_foreground_window_hook != nullptr) {
+        return;
+    }
+
+    auto* const user32 = GetModuleHandleW(L"user32.dll");
+
+    if (user32 == nullptr) {
+        return;
+    }
+
+    const auto hook_one = [&](const char* name, void* destination) -> std::unique_ptr<FunctionHook> {
+        auto* const fn = GetProcAddress(user32, name);
+
+        if (fn == nullptr) {
+            spdlog::error("[Flat3D][OutputWindow] {} not found", name);
+            return nullptr;
+        }
+
+        auto hook = std::make_unique<FunctionHook>((uintptr_t)fn, (uintptr_t)destination);
+
+        if (!hook->create()) {
+            spdlog::error("[Flat3D][OutputWindow] failed to hook {}", name);
+            return nullptr;
+        }
+
+        spdlog::info("[Flat3D][OutputWindow] hooked {}", name);
+
+        return hook;
+    };
+
+    m_get_foreground_window_hook = hook_one("GetForegroundWindow", (void*)&Flat3DOutputWindow::get_foreground_window_hook);
+    m_get_active_window_hook = hook_one("GetActiveWindow", (void*)&Flat3DOutputWindow::get_active_window_hook);
+    m_get_focus_hook = hook_one("GetFocus", (void*)&Flat3DOutputWindow::get_focus_hook);
+}
+
+// Keep the output window in front (Lossless Scaling needs that) but push keyboard focus back to
+// the game, so key messages are delivered somewhere useful. Focus is per input queue, so the two
+// threads have to share one for the duration of the call.
+void Flat3DOutputWindow::hand_focus_to_game() {
+    if (!s_focus_spoof.load() || s_game_window == nullptr) {
+        return;
+    }
+
+    const auto our_thread = GetCurrentThreadId();
+    const auto game_thread = GetWindowThreadProcessId(s_game_window, nullptr);
+
+    if (game_thread == 0 || game_thread == our_thread) {
+        return;
+    }
+
+    if (AttachThreadInput(our_thread, game_thread, TRUE)) {
+        SetFocus(s_game_window);
+        AttachThreadInput(our_thread, game_thread, FALSE);
+    }
+}
 
 static const wchar_t* const s_window_class = L"REF_Flat3D_FullRes_Output";
 
@@ -31,6 +140,15 @@ LRESULT CALLBACK Flat3DOutputWindow::wnd_proc(HWND hwnd, UINT msg, WPARAM wparam
         if (!s_focusable) {
             return HTTRANSPARENT;
         }
+        break;
+    // Clicked or alt-tabbed to: stay in front for Lossless Scaling, but give the keyboard back.
+    case WM_ACTIVATE:
+        if (LOWORD(wparam) != WA_INACTIVE) {
+            hand_focus_to_game();
+        }
+        break;
+    case WM_SETFOCUS:
+        hand_focus_to_game();
         break;
     case WM_CLOSE:
         ShowWindow(hwnd, SW_HIDE);
@@ -300,6 +418,10 @@ bool Flat3DOutputWindow::ensure(ID3D12Device* device, ID3D12CommandQueue* queue,
             m_failed = true;
             return false;
         }
+    }
+
+    if (m_focusable) {
+        install_focus_hooks(game_window);
     }
 
     if (!m_visible) {
