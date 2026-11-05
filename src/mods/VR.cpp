@@ -69,6 +69,7 @@
 #include "ManualFlashlight.hpp"
 #include "TemporalUpscaler.hpp"
 #include "vr/Flat3DGuiRedirect.hpp"
+#include "vr/Flat3DOutputWindow.hpp"
 #include "VR.hpp"
 
 bool inside_on_end = false;
@@ -5318,7 +5319,7 @@ bool VR::on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param) {
         return true;
     }
 
-    auto& out_window = Flat3DOutputWindow::get();
+    auto& out_window = vrmod::Flat3DOutputWindow::get();
 
     if (!out_window.exists() || wnd != g_framework->get_window()) {
         return true;
