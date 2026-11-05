@@ -9,6 +9,7 @@ using namespace Microsoft::WRL;
 
 namespace vrmod {
 std::atomic<bool> Flat3DOutputWindow::s_creating{false};
+bool Flat3DOutputWindow::s_focusable{false};
 
 static const wchar_t* const s_window_class = L"REF_Flat3D_FullRes_Output";
 
@@ -19,12 +20,18 @@ Flat3DOutputWindow& Flat3DOutputWindow::get() {
 
 LRESULT CALLBACK Flat3DOutputWindow::wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch (msg) {
-    // Never take focus and never eat a click: keyboard/mouse keep going to the game, which is
-    // still the foreground window behind us.
+    // Unless the window is meant to be clickable (so Lossless Scaling's auto-scale can latch on),
+    // never take focus and never eat a click: input keeps going to the game behind us.
     case WM_MOUSEACTIVATE:
-        return MA_NOACTIVATE;
+        if (!s_focusable) {
+            return MA_NOACTIVATE;
+        }
+        break;
     case WM_NCHITTEST:
-        return HTTRANSPARENT;
+        if (!s_focusable) {
+            return HTTRANSPARENT;
+        }
+        break;
     case WM_CLOSE:
         ShowWindow(hwnd, SW_HIDE);
         return 0;
@@ -115,7 +122,13 @@ DWORD WINAPI Flat3DOutputWindow::window_thread(LPVOID param) {
     // WS_EX_APPWINDOW (and no WS_EX_TOOLWINDOW) puts it in the taskbar under its own name, so it
     // is tellable from the game's window and can be picked out of Alt+Tab. WS_EX_NOACTIVATE still
     // keeps it from stealing focus.
-    self->m_hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_APPWINDOW, s_window_class,
+    auto ex_style = WS_EX_TOPMOST | WS_EX_APPWINDOW;
+
+    if (!s_focusable) {
+        ex_style |= WS_EX_NOACTIVATE;
+    }
+
+    self->m_hwnd = CreateWindowExW(ex_style, s_window_class,
         L"AFR SBS Output", WS_POPUP, self->m_rect.left, self->m_rect.top,
         self->m_rect.right - self->m_rect.left, self->m_rect.bottom - self->m_rect.top, nullptr, nullptr,
         wc.hInstance, nullptr);
@@ -169,6 +182,7 @@ void Flat3DOutputWindow::shutdown() {
 }
 
 bool Flat3DOutputWindow::create_window(HWND game_window, int monitor_index) {
+    s_focusable = m_focusable; // the window thread reads this while creating the window
     m_rect = pick_monitor(game_window, monitor_index);
     m_width = (uint32_t)(m_rect.right - m_rect.left);
     m_height = (uint32_t)(m_rect.bottom - m_rect.top);

@@ -5181,6 +5181,17 @@ void VR::draw_flat3d_ui() {
         // ModInt32::draw hard-codes a 5..40 slider, so drive the value directly.
         ImGui::SliderInt("Output Monitor (0 = auto)", &m_flat3d_output_window_monitor->value(), 0, 8);
         ImGui::TextDisabled("Auto picks the widest panel. The monitor list is written to the log on creation.");
+
+        m_flat3d_output_window_focusable->draw("Allow Focus (for Lossless Scaling)");
+        ImGui::TextWrapped("Lossless Scaling's auto-scale only attaches to a window once it reaches the "
+                           "foreground, so turn this on to let the output window be clicked. Takes effect on "
+                           "the next launch.");
+
+        m_flat3d_output_window_focus_spoof->draw("Keep Game Input While Output Window Is Focused");
+        ImGui::TextWrapped("Hides the focus loss from the game so it keeps reading the controller and "
+                           "keyboard while the output window holds focus. Only applies while the foreground "
+                           "window belongs to the game's own process, so alt-tabbing to another application "
+                           "still releases input.");
     }
 
     if (ImGui::TreeNode("Ghosting / Crosstalk")) {
@@ -5289,6 +5300,58 @@ void VR::draw_flat3d_ui() {
     ImGui::Checkbox("Disable View Matrix Override", &m_disable_view_matrix_override);
     ImGui::Checkbox("Disable Temporal Fix", &m_disable_temporal_fix);
     ImGui::Checkbox("Disable Post Effect Fix", &m_disable_post_effect_fix);
+}
+
+bool VR::on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param) {
+    // Focus spoof for the full-resolution output window.
+    //
+    // Lossless Scaling's auto-scale only attaches to a window once it reaches the foreground, so
+    // the output window has to be clickable. Clicking it takes focus away from the game, and the
+    // game then stops reading input - a controller included - which leaves the two mutually
+    // exclusive: scaling or control, never both.
+    //
+    // Swallowing the focus-loss messages keeps the game believing it is still active. This is
+    // deliberately limited to the case where the foreground window belongs to THIS process, i.e.
+    // the user clicked our own output window: a real alt-tab to another application lands
+    // elsewhere and still releases input, which is what the user expects.
+    if (!m_flat3d_output_window_focus_spoof->value() || !m_flat3d_output_window->value()) {
+        return true;
+    }
+
+    auto& out_window = Flat3DOutputWindow::get();
+
+    if (!out_window.exists() || wnd != g_framework->get_window()) {
+        return true;
+    }
+
+    switch (message) {
+    case WM_KILLFOCUS:
+    case WM_ACTIVATE:
+    case WM_ACTIVATEAPP:
+    case WM_NCACTIVATE:
+        break;
+    default:
+        return true;
+    }
+
+    // Only a deactivation is worth hiding; let activations through untouched.
+    const auto is_deactivation = (message == WM_KILLFOCUS)
+        || (message == WM_ACTIVATE && LOWORD(w_param) == WA_INACTIVE)
+        || (message == WM_ACTIVATEAPP && w_param == FALSE)
+        || (message == WM_NCACTIVATE && w_param == FALSE);
+
+    if (!is_deactivation) {
+        return true;
+    }
+
+    DWORD foreground_pid{};
+    GetWindowThreadProcessId(GetForegroundWindow(), &foreground_pid);
+
+    if (foreground_pid != GetCurrentProcessId()) {
+        return true;
+    }
+
+    return false;
 }
 
 void VR::on_device_reset() {

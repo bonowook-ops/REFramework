@@ -26,6 +26,15 @@ public:
     // anything fails, so the caller silently falls back to the in-backbuffer compose.
     bool ensure(ID3D12Device* device, ID3D12CommandQueue* queue, DXGI_FORMAT format, HWND game_window, int monitor_index);
 
+    // Lossless Scaling's auto-scale attaches to the window that comes to the foreground, so the
+    // output window has to be clickable for it to latch on. That costs the game its focus, which
+    // is what stops controller input - see VR::on_message's focus spoof.
+    void set_focusable(bool focusable) { m_focusable = focusable; }
+    bool is_focusable() const { return m_focusable; }
+
+    HWND window() const { return m_hwnd; }
+    bool exists() const { return m_hwnd != nullptr; }
+
     void hide();
     void reset();
 
@@ -72,5 +81,7 @@ private:
     bool m_tearing{false};
     bool m_failed{false};
     bool m_visible{false};
+    bool m_focusable{false};
+    static bool s_focusable; // read from the window thread, which has no instance pointer yet
 };
 } // namespace vrmod

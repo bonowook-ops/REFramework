@@ -89,6 +89,7 @@ public:
 
     void on_draw_ui() override;
     void on_device_reset() override;
+    bool on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param) override;
 
     void on_config_load(const utility::Config& cfg) override;
     void on_config_save(utility::Config& cfg) override;
@@ -804,6 +805,12 @@ public:
     const ModToggle::Ptr m_flat3d_output_window{ ModToggle::create(generate_name("Flat3D_OutputWindow"), false) };
     // 0 = auto (widest panel, i.e. the 32:9 one), 1..N = Windows monitor order as logged on creation.
     const ModInt32::Ptr m_flat3d_output_window_monitor{ ModInt32::create(generate_name("Flat3D_OutputWindowMonitor"), 0) };
+    // Lossless Scaling's auto-scale only latches onto a window that can come to the foreground.
+    const ModToggle::Ptr m_flat3d_output_window_focusable{ ModToggle::create(generate_name("Flat3D_OutputWindowFocusable"), false) };
+    // ...which costs the game its focus, and the game then stops reading the controller. Hide the
+    // focus loss from it, but only while the foreground window belongs to this same process, so a
+    // real alt-tab to another application still releases input as the user expects.
+    const ModToggle::Ptr m_flat3d_output_window_focus_spoof{ ModToggle::create(generate_name("Flat3D_OutputWindowFocusSpoof"), true) };
     // Clip-space separation (dynamic3d 1.3) is THE stereo knob: the projection shear IS this value,
     // and it equals total BACKGROUND disparity as a fraction of the screen width. Being a clip-space
     // quantity it is FoV-independent by construction, so the old reference-FoV slider and its
@@ -974,6 +981,8 @@ public:
         *m_flat3d_eye_swap,
         *m_flat3d_output_window,
         *m_flat3d_output_window_monitor,
+        *m_flat3d_output_window_focusable,
+        *m_flat3d_output_window_focus_spoof,
         *m_flat3d_separation,
         *m_flat3d_convergence,
         *m_flat3d_ghost_contrast,
