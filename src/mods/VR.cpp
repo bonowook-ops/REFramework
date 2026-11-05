@@ -5193,6 +5193,11 @@ void VR::draw_flat3d_ui() {
                            "keyboard while the output window holds focus. Only applies while the foreground "
                            "window belongs to the game's own process, so alt-tabbing to another application "
                            "still releases input.");
+
+        m_flat3d_output_window_keyboard_handoff->draw("Hand Keyboard Focus Back To The Game");
+        ImGui::TextWrapped("Only needed for mouse and keyboard; a controller works without it. Turning it "
+                           "on also pulls the game's window to the front, so Lossless Scaling follows it "
+                           "off the output window and has to be pointed back by hand.");
     }
 
     if (ImGui::TreeNode("Ghosting / Crosstalk")) {

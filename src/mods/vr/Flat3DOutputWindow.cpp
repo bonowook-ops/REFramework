@@ -14,8 +14,14 @@ std::atomic<bool> Flat3DOutputWindow::s_focus_spoof{true};
 HWND Flat3DOutputWindow::s_game_window{nullptr};
 Flat3DOutputWindow* Flat3DOutputWindow::s_instance{nullptr};
 
+std::atomic<bool> Flat3DOutputWindow::s_keyboard_handoff{false};
+
 void Flat3DOutputWindow::set_focus_spoof(bool enabled) {
     s_focus_spoof.store(enabled);
+}
+
+void Flat3DOutputWindow::set_keyboard_handoff(bool enabled) {
+    s_keyboard_handoff.store(enabled);
 }
 
 // Answer with the game's window, but only when the window actually in front is ours. Any other
@@ -103,7 +109,11 @@ void Flat3DOutputWindow::install_focus_hooks(HWND game_window) {
 // the game, so key messages are delivered somewhere useful. Focus is per input queue, so the two
 // threads have to share one for the duration of the call.
 void Flat3DOutputWindow::hand_focus_to_game() {
-    if (!s_focus_spoof.load() || s_game_window == nullptr) {
+    // SetFocus across attached input queues drags activation along with it, so the game window
+    // ends up in front and Lossless Scaling follows it away from the output window. A controller
+    // does not need this at all - the foreground-query hooks are enough - so it stays off unless
+    // the keyboard is actually wanted, and then Lossless Scaling has to be pointed by hand.
+    if (!s_keyboard_handoff.load() || !s_focus_spoof.load() || s_game_window == nullptr) {
         return;
     }
 

@@ -811,6 +811,11 @@ public:
     // focus loss from it, but only while the foreground window belongs to this same process, so a
     // real alt-tab to another application still releases input as the user expects.
     const ModToggle::Ptr m_flat3d_output_window_focus_spoof{ ModToggle::create(generate_name("Flat3D_OutputWindowFocusSpoof"), true) };
+    // Handing keyboard focus back to the game also drags activation with it, so the game window
+    // becomes the foreground one and Lossless Scaling follows it off the output window. Off by
+    // default: a controller needs none of this, and keeping the output window in front is what
+    // Lossless Scaling's auto-scale depends on.
+    const ModToggle::Ptr m_flat3d_output_window_keyboard_handoff{ ModToggle::create(generate_name("Flat3D_OutputWindowKeyboardHandoff"), false) };
     // Clip-space separation (dynamic3d 1.3) is THE stereo knob: the projection shear IS this value,
     // and it equals total BACKGROUND disparity as a fraction of the screen width. Being a clip-space
     // quantity it is FoV-independent by construction, so the old reference-FoV slider and its
@@ -983,6 +988,7 @@ public:
         *m_flat3d_output_window_monitor,
         *m_flat3d_output_window_focusable,
         *m_flat3d_output_window_focus_spoof,
+        *m_flat3d_output_window_keyboard_handoff,
         *m_flat3d_separation,
         *m_flat3d_convergence,
         *m_flat3d_ghost_contrast,

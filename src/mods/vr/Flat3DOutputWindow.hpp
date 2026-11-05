@@ -48,6 +48,7 @@ public:
     //    AttachThreadInput, so it stays the foreground window for Lossless Scaling while key
     //    messages go where they are useful.
     void set_focus_spoof(bool enabled);
+    void set_keyboard_handoff(bool enabled);
     void install_focus_hooks(HWND game_window);
 
     void hide();
@@ -107,6 +108,7 @@ private:
     static HWND spoof(HWND real);
 
     static std::atomic<bool> s_focus_spoof;
+    static std::atomic<bool> s_keyboard_handoff;
     static HWND s_game_window;
     static Flat3DOutputWindow* s_instance;
 
